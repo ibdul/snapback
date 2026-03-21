@@ -338,19 +338,27 @@ export default function App() {
       }
 
       if (listPatch.__type === "create") {
-        const _now = new Date()
-        const now = _now.valueOf()
+        const _now = new Date();
+        const now = _now.valueOf();
 
         taskMap.set(listPatch.id, {
           id: listPatch.id,
-          title: typeof listPatch.title === "string" ? listPatch.title : "Untitled Task",
-          status: typeof listPatch.status === "string" ? listPatch.status : "todo",
-          createdAt: typeof listPatch.createdAt === "number" ? listPatch.createdAt : now,
+          title: typeof listPatch.title === "string"
+            ? listPatch.title
+            : "Untitled Task",
+          status: typeof listPatch.status === "string"
+            ? listPatch.status
+            : "todo",
+          createdAt: typeof listPatch.createdAt === "number"
+            ? listPatch.createdAt
+            : now,
         });
       }
     });
 
-    return Array.from(taskMap.values()).sort((a, b) => b.createdAt - a.createdAt);
+    return Array.from(taskMap.values()).sort((a, b) =>
+      b.createdAt - a.createdAt
+    );
   }, [taskListSnapbackStateDict, tasks]);
 
   const createRequest = (
@@ -383,20 +391,32 @@ export default function App() {
     const title = "Task Layer " + id;
     const createdAt = Date.now();
 
-    createRequest(`Create Task`, { id, title, status: "todo", createdAt }, "list", "create", () => {
-      setTasks((prev) => [...prev, { id, title, status: "todo", createdAt }]);
-    });
+    createRequest(
+      `Create Task`,
+      { id, title, status: "todo", createdAt },
+      "list",
+      "create",
+      () => {
+        setTasks((prev) => [...prev, { id, title, status: "todo", createdAt }]);
+      },
+    );
   };
 
   const editTask = (id: string, title: string) => {
     const [main_title, revision] = title.split("_v");
     const current_revision = revision?.trim() ?? "1";
     const newTitle = `${main_title} _v ${Number(current_revision) + 1}`;
-    createRequest(`Edit Task ${id}`, { id, title: newTitle }, "detail", "update", () => {
-      setTasks((prev) =>
-        prev.map((t) => t.id === id ? { ...t, title: newTitle } : t)
-      );
-    });
+    createRequest(
+      `Edit Task ${id}`,
+      { id, title: newTitle },
+      "detail",
+      "update",
+      () => {
+        setTasks((prev) =>
+          prev.map((t) => t.id === id ? { ...t, title: newTitle } : t)
+        );
+      },
+    );
   };
 
   const deleteTask = (id: string) => {
@@ -591,9 +611,12 @@ export default function App() {
                               <Fragment key={crypto.randomUUID()}></Fragment>
                             );
                           }
-                          const taskDetails = getTaskDetailSnapbackState(_task.id) as Partial<Task>;
+                          const taskDetails = getTaskDetailSnapbackState(
+                            _task.id,
+                          ) as Partial<Task>;
                           const task = { ..._task, ...taskDetails };
-                          const hasPending = Boolean(taskListSnapbackState[_task.id]?.length) ||
+                          const hasPending =
+                            Boolean(taskListSnapbackState[_task.id]?.length) ||
                             Boolean(taskDetailsSnapbackState[_task.id]?.length);
                           return (
                             <motion.div
@@ -704,34 +727,32 @@ export default function App() {
                 </div>
 
                 <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-grow">
-                  <AnimatePresence initial={false}>
-                    {pendingRequests.length === 0
-                      ? (
-                        <motion.div
-                          key="empty-layers"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="py-20 flex flex-col items-center justify-center text-slate-600 space-y-3 opacity-50"
-                        >
-                          <Layers size={32} />
-                          <p className="text-xs uppercase tracking-tighter text-center px-4">
-                            No active network requests
-                          </p>
-                        </motion.div>
-                      )
-                      : (
-                        pendingRequests.map((req) => (
-                          <PatchItem
-                            key={req.requestId}
-                            req={req}
-                            onFail={handleManualFail}
-                            onCancel={handleManualCancel}
-                            isPaused={isPaused}
-                          />
-                        ))
-                      )}
-                  </AnimatePresence>
+                  {pendingRequests.length === 0
+                    ? (
+                      <motion.div
+                        key="empty-layers"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="py-20 flex flex-col items-center justify-center text-slate-600 space-y-3 opacity-50"
+                      >
+                        <Layers size={32} />
+                        <p className="text-xs uppercase tracking-tighter text-center px-4">
+                          No active network requests
+                        </p>
+                      </motion.div>
+                    )
+                    : (
+                      pendingRequests.map((req) => (
+                        <PatchItem
+                          key={req.requestId}
+                          req={req}
+                          onFail={handleManualFail}
+                          onCancel={handleManualCancel}
+                          isPaused={isPaused}
+                        />
+                      ))
+                    )}
                 </div>
 
                 <div className="mt-6 pt-6 border-t border-white/5 shrink-0">
