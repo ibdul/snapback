@@ -89,12 +89,24 @@ type Patch = {
   id: string;
 } & Record<string, string | number>;
 
+type Task = {
+  id: string;
+  title: string;
+  status: string;
+  createdAt: number;
+};
+
+type ListPatch = Task & {
+  __type?: "create" | "delete";
+};
+
 type PendingRequest = {
   requestId: string;
   id: string;
   label: string;
   patch: Patch;
   type: string;
+  layer: "list" | "detail";
   latency: number;
   elapsed: number;
   onComplete: () => void;
@@ -227,11 +239,13 @@ export default function App() {
   const [latency, setLatency] = useState(3000);
   const [isPaused, setIsPaused] = useState(false);
   const [activeTab, setActiveTab] = useState("init");
+
   const now = useMemo(() => {
     const out = new Date();
     return out.valueOf();
   }, []);
-  const [tasks, setTasks] = useState([
+
+  const [tasks, setTasks] = useState<Task[]>([
     {
       id: "1",
       title: "Refactor state logic",
@@ -246,13 +260,21 @@ export default function App() {
     },
   ]);
 
+  // task details
   const {
-    applyUpdate,
-    snapback_state,
-    rollbackUpdate,
-    getSnapbackState,
-    // rawUpdates,
-  } = useSnapbackLayer();
+    applyUpdate: applyTaskDetailUpdate,
+    snapback_state: taskDetailsSnapbackState,
+    rollbackUpdate: rollbackTaskDetailUpdate,
+    getSnapbackState: getTaskDetailSnapbackState,
+  } = useSnapbackLayer<Task>();
+
+  // list membership and create/delete operations
+  const {
+    applyUpdate: applyTaskListUpdate,
+    snapback_state: taskListSnapbackState,
+    snapback_state_dict: taskListSnapbackStateDict,
+    rollbackUpdate: rollbackTaskListUpdate,
+  } = useSnapbackLayer<ListPatch>();
 
   const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
 
@@ -276,7 +298,11 @@ export default function App() {
           const newElapsed = req.elapsed + tickRate;
           if (newElapsed >= req.latency) {
             req.onComplete();
-            rollbackUpdate(req.id, req.requestId);
+            if (req.layer === "list") {
+              rollbackTaskListUpdate(req.id, req.requestId);
+            } else {
+              rollbackTaskDetailUpdate(req.id, req.requestId);
+            }
             hasChanges = true;
           } else {
             next.push({ ...req, elapsed: newElapsed });
@@ -289,21 +315,58 @@ export default function App() {
     return () => clearInterval(interval);
   }, []);
 
-  const optimisticTasks = tasks.sort((a, b) => b.createdAt - a.createdAt);
+  const optimisticTasks = useMemo(() => {
+    const taskMap = new Map<string, Task>();
+
+    tasks.forEach((task) => {
+      taskMap.set(task.id, task);
+    });
+
+    Object.values(taskListSnapbackStateDict).forEach((patch) => {
+      const listPatch = patch as Partial<ListPatch>;
+
+      if (!listPatch.id) {
+        return;
+      }
+
+      if (listPatch.__type === "delete") {
+        taskMap.delete(listPatch.id);
+        return;
+      }
+
+      if (listPatch.__type === "create") {
+        const _now = new Date()
+        const now = _now.valueOf()
+
+        taskMap.set(listPatch.id, {
+          id: listPatch.id,
+          title: typeof listPatch.title === "string" ? listPatch.title : "Untitled Task",
+          status: typeof listPatch.status === "string" ? listPatch.status : "todo",
+          createdAt: typeof listPatch.createdAt === "number" ? listPatch.createdAt : now,
+        });
+      }
+    });
+
+    return Array.from(taskMap.values()).sort((a, b) => b.createdAt - a.createdAt);
+  }, [taskListSnapbackStateDict, tasks]);
 
   const createRequest = (
     label: string,
     patch: Patch,
+    layer: PendingRequest["layer"],
     type = "update",
     onComplete: () => void,
   ) => {
-    const reqId = applyUpdate({ ...patch, __type: type });
+    const reqId = layer === "list"
+      ? applyTaskListUpdate({ ...patch, __type: type } as ListPatch)
+      : applyTaskDetailUpdate(patch as Task);
     const newReq = {
       requestId: reqId,
       id: patch.id,
       label,
       patch,
       type,
+      layer,
       latency: latency,
       elapsed: 0,
       onComplete: onComplete,
@@ -314,10 +377,10 @@ export default function App() {
 
   const addTask = () => {
     const id = Math.random().toString(36).substr(2, 5);
-    const title = "New Task Layer";
+    const title = "Task Layer " + id;
     const createdAt = Date.now();
 
-    createRequest(`Create Task`, { id, title, createdAt }, "create", () => {
+    createRequest(`Create Task`, { id, title, status: "todo", createdAt }, "list", "create", () => {
       setTasks((prev) => [...prev, { id, title, status: "todo", createdAt }]);
     });
   };
@@ -326,7 +389,7 @@ export default function App() {
     const [main_title, revision] = title.split("_v");
     const current_revision = revision?.trim() ?? "1";
     const newTitle = `${main_title} _v ${Number(current_revision) + 1}`;
-    createRequest(`Edit Task ${id}`, { id, title: newTitle }, "update", () => {
+    createRequest(`Edit Task ${id}`, { id, title: newTitle }, "detail", "update", () => {
       setTasks((prev) =>
         prev.map((t) => t.id === id ? { ...t, title: newTitle } : t)
       );
@@ -334,7 +397,7 @@ export default function App() {
   };
 
   const deleteTask = (id: string) => {
-    createRequest(`Delete Task ${id}`, { id }, "delete", () => {
+    createRequest(`Delete Task ${id}`, { id }, "list", "delete", () => {
       setTasks((prev) => prev.filter((t) => t.id !== id));
     });
   };
@@ -347,6 +410,7 @@ export default function App() {
       createRequest(
         `Batch Delete: ${task.id}`,
         { id: task.id },
+        "list",
         "delete",
         () => {
           setTasks((prev) => prev.filter((t) => t.id !== task.id));
@@ -359,14 +423,22 @@ export default function App() {
     setPendingRequests((prev) =>
       prev.filter((r) => r.requestId !== req.requestId)
     );
-    rollbackUpdate(req.id, req.requestId);
+    if (req.layer === "list") {
+      rollbackTaskListUpdate(req.id, req.requestId);
+      return;
+    }
+    rollbackTaskDetailUpdate(req.id, req.requestId);
   };
 
   const handleManualCancel = (req: PendingRequest) => {
     setPendingRequests((prev) =>
       prev.filter((r) => r.requestId !== req.requestId)
     );
-    rollbackUpdate(req.id, req.requestId);
+    if (req.layer === "list") {
+      rollbackTaskListUpdate(req.id, req.requestId);
+      return;
+    }
+    rollbackTaskDetailUpdate(req.id, req.requestId);
   };
 
   return (
@@ -516,9 +588,10 @@ export default function App() {
                               <Fragment key={crypto.randomUUID()}></Fragment>
                             );
                           }
-                          const task_snap = getSnapbackState(_task.id);
-                          const task = { ..._task, ...task_snap };
-                          const hasPending = !!snapback_state[_task.id]?.length;
+                          const taskDetails = getTaskDetailSnapbackState(_task.id) as Partial<Task>;
+                          const task = { ..._task, ...taskDetails };
+                          const hasPending = Boolean(taskListSnapbackState[_task.id]?.length) ||
+                            Boolean(taskDetailsSnapbackState[_task.id]?.length);
                           return (
                             <motion.div
                               key={task.id}
