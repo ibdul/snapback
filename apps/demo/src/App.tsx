@@ -545,13 +545,46 @@ export default function App() {
 
         {/* Sandbox Section */}
         <section className="space-y-12">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/5 pb-8">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-primary font-bold uppercase tracking-widest text-xs">
+                <BookOpen size={14} /> Usage Example
+              </div>
+              <h2 className="text-4xl font-black text-white tracking-tight">
+                Live Sandbox
+              </h2>
+            </div>
+
+            <div className="flex items-center gap-6">
+              <div className="space-y-1">
+                <div className="text-[10px] uppercase font-bold text-slate-500">
+                  Global Latency
+                </div>
+                <div className="flex items-center gap-4">
+                  <input
+                    type="range"
+                    min="500"
+                    max="10000"
+                    step="500"
+                    value={latency}
+                    onChange={(e) => setLatency(Number(e.target.value))}
+                    className="w-32 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                  />
+                  <span className="text-xs font-mono text-cyan-400">
+                    {latency}ms
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-8 space-y-6">
               <div className="bg-[#0d1526] rounded-3xl border border-white/5 p-8 relative overflow-hidden flex flex-col h-[640px]">
                 <div className="flex justify-between items-center mb-8 relative z-10 shrink-0">
                   <div>
                     <h2 className="text-2xl font-bold text-white">
-                      Live Sandbox
+                      Task Queue
                     </h2>
                     <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mt-1">
                       Interactive state visualization
@@ -674,34 +707,6 @@ export default function App() {
                       })}
                     </AnimatePresence>
                   </div>
-                </div>
-              </div>
-
-              <div className="bg-[#0d1526] rounded-2xl border border-white/5 p-6 flex items-center justify-between">
-                <div className="flex items-center gap-6">
-                  <div className="space-y-1">
-                    <div className="text-[10px] uppercase font-bold text-slate-500">
-                      Global Latency
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <input
-                        type="range"
-                        min="500"
-                        max="10000"
-                        step="500"
-                        value={latency}
-                        onChange={(e) => setLatency(Number(e.target.value))}
-                        className="w-32 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-                      />
-                      <span className="text-xs font-mono text-cyan-400">
-                        {latency}ms
-                      </span>
-                    </div>
-                  </div>
-                </div>
-                <div className="hidden md:flex items-center gap-2 text-slate-500 text-xs italic">
-                  <Info size={14} />{" "}
-                  Layers are applied in order of request timestamp.
                 </div>
               </div>
             </div>
