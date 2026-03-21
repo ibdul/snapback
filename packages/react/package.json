@@ -16,7 +16,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@snapback/core": "file:../core"
+    "@snapback/core": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=16.8.0"
