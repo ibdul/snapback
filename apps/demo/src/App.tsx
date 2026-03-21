@@ -127,10 +127,10 @@ const PatchItem = (
   return (
     <motion.div
       layout
-      initial={{ opacity: 0, x: 20 }}
+      initial={{ opacity: 0, x: -20 }}
       animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, scale: 0.95 }}
-      className="rounded-xl border border-white/10 bg-white/5 overflow-hidden transition-all"
+      exit={{ opacity: 0, x: 20 }}
+      className="rounded-xl border border-white/10 bg-white/5 overflow-hidden"
     >
       <div className="p-3">
         <div className="flex justify-between items-center mb-2">
@@ -585,98 +585,95 @@ export default function App() {
                   </div>
                 </div>
 
-                <div className="space-y-3 relative z-10 overflow-y-auto flex-grow pr-2 custom-scrollbar">
-                  <AnimatePresence mode="popLayout">
-                    {optimisticTasks.length === 0
-                      ? (
-                        <motion.div
-                          key="empty"
-                          initial={{ opacity: 0, scale: 0.9 }}
-                          animate={{ opacity: 1, scale: 1 }}
-                          exit={{ opacity: 0, scale: 0.9 }}
-                          className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-2xl text-slate-600 space-y-4"
-                        >
-                          <div className="p-4 bg-white/5 rounded-full">
-                            <CheckCircle2 size={32} className="opacity-20" />
-                          </div>
-                          <p className="text-sm italic">
-                            Queue cleared. Trigger an update to see layers.
-                          </p>
-                        </motion.div>
-                      )
-                      : (
-                        optimisticTasks.map((_task) => {
-                          if (!_task) {
-                            return (
-                              <Fragment key={crypto.randomUUID()}></Fragment>
-                            );
-                          }
-                          const taskDetails = getTaskDetailSnapbackState(
-                            _task.id,
-                          ) as Partial<Task>;
-                          const task = { ..._task, ...taskDetails };
-                          const hasPending =
-                            Boolean(taskListSnapbackState[_task.id]?.length) ||
-                            Boolean(taskDetailsSnapbackState[_task.id]?.length);
+                <div className="relative z-10 flex-grow pr-2 overflow-y-auto">
+                  <div
+                    className="absolute inset-0 py-20 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-2xl text-slate-600 space-y-4 transition-opacity"
+                    style={{
+                      opacity: optimisticTasks.length === 0 ? 1 : 0,
+                    }}
+                  >
+                    <div className="p-4 bg-white/5 rounded-full">
+                      <CheckCircle2 size={32} className="opacity-20" />
+                    </div>
+                    <p className="text-sm italic">
+                      Queue cleared. Trigger an update to see layers.
+                    </p>
+                  </div>
+
+                  <div className="relative overflow-y-auto overflow-x-hidden custom-scrollbar space-y-3 h-full flex-1">
+                    <AnimatePresence initial={true}>
+                      {optimisticTasks.map((_task) => {
+                        if (!_task) {
                           return (
-                            <motion.div
-                              key={task.id}
-                              layout
-                              initial={{ opacity: 0, x: -20 }}
-                              animate={{ opacity: 1, x: 0 }}
-                              exit={{ opacity: 0, scale: 0.95 }}
-                              transition={{ duration: 0.2 }}
-                              className={`group flex justify-between items-center p-5 bg-white/5 rounded-2xl border transition-all ${hasPending
-                                ? "border-cyan-500/30 bg-cyan-500/5 shadow-[0_0_20px_rgba(6,182,212,0.05)]"
-                                : "border-white/5 hover:border-white/10"
-                                }`}
-                            >
-                              <div className="flex items-center gap-4">
-                                <div
-                                  className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors ${hasPending
-                                    ? "border-cyan-500/50 text-cyan-400 bg-cyan-500/10 animate-pulse"
-                                    : "border-white/10 text-slate-600"
-                                    }`}
-                                >
-                                  {hasPending
-                                    ? <Zap size={18} fill="currentColor" />
-                                    : <CheckCircle2 size={18} />}
-                                </div>
-                                <div>
-                                  <div className="text-white font-medium">
-                                    {task.title}
-                                  </div>
-                                  <div className="flex items-center gap-2 mt-1">
-                                    <span className="text-[9px] text-slate-600 font-mono px-1.5 py-0.5 rounded bg-black/40 border border-white/5">
-                                      ID: {task.id}
-                                    </span>
-                                    {hasPending && (
-                                      <span className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider animate-pulse">
-                                        Syncing...
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                              </div>
-                              <div className="flex gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                <button
-                                  onClick={() => editTask(task.id, task.title)}
-                                  className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 rounded-lg transition-colors"
-                                >
-                                  <Edit3 size={16} />
-                                </button>
-                                <button
-                                  onClick={() => deleteTask(task.id)}
-                                  className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-colors"
-                                >
-                                  <Trash2 size={16} />
-                                </button>
-                              </div>
-                            </motion.div>
+                            <Fragment key={crypto.randomUUID()}></Fragment>
                           );
-                        })
-                      )}
-                  </AnimatePresence>
+                        }
+                        const taskDetails = getTaskDetailSnapbackState(
+                          _task.id,
+                        ) as Partial<Task>;
+                        const task = { ..._task, ...taskDetails };
+                        const hasPending =
+                          Boolean(taskListSnapbackState[_task.id]?.length) ||
+                          Boolean(taskDetailsSnapbackState[_task.id]?.length);
+                        return (
+                          <motion.div
+                            key={task.id}
+                            layout
+                            initial={{ opacity: 0, x: -20 }}
+                            animate={{ opacity: 1, x: 0 }}
+                            exit={{ opacity: 0, x: 20 }}
+                            transition={{ duration: 0.2 }}
+                            className={`group flex justify-between items-center p-5 bg-white/5 rounded-2xl border transition-colors ${hasPending
+                              ? "border-cyan-500/30 bg-cyan-500/5 shadow-[0_0_20px_rgba(6,182,212,0.05)]"
+                              : "border-white/5 hover:border-white/10"
+                              }`}
+                          >
+                            <div className="flex items-center gap-4">
+                              <div
+                                className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors ${hasPending
+                                  ? "border-cyan-500/50 text-cyan-400 bg-cyan-500/10 animate-pulse"
+                                  : "border-white/10 text-slate-600"
+                                  }`}
+                              >
+                                {hasPending
+                                  ? <Zap size={18} fill="currentColor" />
+                                  : <CheckCircle2 size={18} />}
+                              </div>
+                              <div>
+                                <div className="text-white font-medium">
+                                  {task.title}
+                                </div>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[9px] text-slate-600 font-mono px-1.5 py-0.5 rounded bg-black/40 border border-white/5">
+                                    ID: {task.id}
+                                  </span>
+                                  {hasPending && (
+                                    <span className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider animate-pulse">
+                                      Syncing...
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
+                                onClick={() => editTask(task.id, task.title)}
+                                className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 rounded-lg transition-colors"
+                              >
+                                <Edit3 size={16} />
+                              </button>
+                              <button
+                                onClick={() => deleteTask(task.id)}
+                                className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-colors"
+                              >
+                                <Trash2 size={16} />
+                              </button>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
                 </div>
               </div>
 
@@ -726,24 +723,23 @@ export default function App() {
                   )}
                 </div>
 
-                <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-grow">
-                  {pendingRequests.length === 0
-                    ? (
-                      <motion.div
-                        key="empty-layers"
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        className="py-20 flex flex-col items-center justify-center text-slate-600 space-y-3 opacity-50"
-                      >
-                        <Layers size={32} />
-                        <p className="text-xs uppercase tracking-tighter text-center px-4">
-                          No active network requests
-                        </p>
-                      </motion.div>
-                    )
-                    : (
-                      pendingRequests.map((req) => (
+                <div className="pr-2 flex-grow relative h-[68%]">
+                  <motion.div
+                    key="empty-layers"
+                    style={{
+                      opacity: pendingRequests.length === 0 ? 1 : 0,
+                    }}
+                    className="py-20 flex flex-col items-center justify-center text-slate-600 space-y-3 opacity-50 absolute inset-0 transition-opacity"
+                  >
+                    <Layers size={32} />
+                    <p className="text-xs uppercase tracking-tighter text-center px-4">
+                      No active network requests
+                    </p>
+                  </motion.div>
+
+                  <div className="space-y-3 custom-scrollbar overflow-hidden max-h-[100%] overflow-y-auto relative ">
+                    <AnimatePresence initial={false}>
+                      {pendingRequests.map((req) => (
                         <PatchItem
                           key={req.requestId}
                           req={req}
@@ -751,8 +747,9 @@ export default function App() {
                           onCancel={handleManualCancel}
                           isPaused={isPaused}
                         />
-                      ))
-                    )}
+                      ))}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
                 <div className="mt-6 pt-6 border-t border-white/5 shrink-0">
