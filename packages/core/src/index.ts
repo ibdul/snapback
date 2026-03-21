@@ -39,7 +39,6 @@ export function createSnapbackLayer<T = unknown>(
 ): SnapbackStore<T> {
   const createId = options.createId ?? defaultCreateId;
   let snapbackState: SnapbackQueue<T> = {};
-  const snapbackStateRef = { current: snapbackState };
   const listeners = new Set<() => void>();
 
   function emitChange() {
@@ -48,12 +47,11 @@ export function createSnapbackLayer<T = unknown>(
 
   function syncQueue(nextState: SnapbackQueue<T>) {
     snapbackState = nextState;
-    snapbackStateRef.current = nextState;
     emitChange();
   }
 
   function getSnapbackState(id: EntityId): Entity<T> {
-    const patches = snapbackStateRef.current[id] || [];
+    const patches = snapbackState[id] || [];
 
     return patches.reduce(
       (currentState, update) => ({ ...currentState, ...update.patch }),
@@ -71,9 +69,9 @@ export function createSnapbackLayer<T = unknown>(
       requestId,
     };
 
-    const queue = [...(snapbackStateRef.current[entityId] || []), newUpdate];
+    const queue = [...(snapbackState[entityId] || []), newUpdate];
     syncQueue({
-      ...snapbackStateRef.current,
+      ...snapbackState,
       [entityId]: queue,
     });
 
@@ -81,13 +79,13 @@ export function createSnapbackLayer<T = unknown>(
   }
 
   function rollbackUpdate(entityId: EntityId, requestId: string) {
-    const queue = snapbackStateRef.current[entityId];
+    const queue = snapbackState[entityId];
     if (!queue) {
       return;
     }
 
     const newQueue = queue.filter((update) => update.requestId !== requestId);
-    const nextState = { ...snapbackStateRef.current };
+    const nextState = { ...snapbackState };
 
     if (newQueue.length === 0) {
       delete nextState[entityId];
@@ -104,7 +102,7 @@ export function createSnapbackLayer<T = unknown>(
       return;
     }
 
-    const nextState = { ...snapbackStateRef.current };
+    const nextState = { ...snapbackState };
     delete nextState[entityId];
     syncQueue(nextState);
   }
@@ -124,13 +122,13 @@ export function createSnapbackLayer<T = unknown>(
     get snapback_state_dict() {
       const out = {} as Record<string, Entity<T>>;
 
-      Object.keys(snapbackStateRef.current).forEach((key) => {
+      Object.keys(snapbackState).forEach((key) => {
         out[key] = getSnapbackState(key);
       });
 
       return out;
     },
-    snapback_state_ref: snapbackStateRef,
+    snapback_state_ref: { current: snapbackState },
     applyUpdate,
     getSnapbackState,
     rollbackUpdate,
