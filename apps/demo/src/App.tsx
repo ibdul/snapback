@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "motion/react";
 
 import {
   AlertCircle,
+  ArrowDownUp,
   Bolt,
   BookOpen,
   CheckCircle2,
@@ -554,28 +555,6 @@ export default function App() {
                 Live Sandbox
               </h2>
             </div>
-
-            <div className="flex items-center gap-6">
-              <div className="space-y-1">
-                <div className="text-[10px] uppercase font-bold text-slate-500">
-                  Global Latency
-                </div>
-                <div className="flex items-center gap-4">
-                  <input
-                    type="range"
-                    min="500"
-                    max="10000"
-                    step="500"
-                    value={latency}
-                    onChange={(e) => setLatency(Number(e.target.value))}
-                    className="w-32 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-                  />
-                  <span className="text-xs font-mono text-cyan-400">
-                    {latency}ms
-                  </span>
-                </div>
-              </div>
-            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -759,12 +738,30 @@ export default function App() {
 
                 <div className="mt-6 pt-6 border-t border-white/5 shrink-0">
                   <div className="bg-black/40 p-4 rounded-2xl border border-white/5 space-y-2">
-                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                      <Terminal size={12} /> Optimization
-                    </h4>
+                    <div className="flex items-center gap-6">
+                      <div className="space-y-1">
+                        <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                          <ArrowDownUp size={12} /> Simulated Latency
+                        </h4>
+                        <div className="flex items-center gap-4 w-full">
+                          <input
+                            type="range"
+                            min="500"
+                            max="10000"
+                            step="500"
+                            value={latency}
+                            onChange={(e) => setLatency(Number(e.target.value))}
+                            className="w-full h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                          />
+                          <span className="text-xs font-mono text-cyan-400">
+                            {latency}ms
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
                     <p className="text-[11px] text-slate-500 leading-relaxed">
-                      This UI logic separates the "Truth" (Base Data) from the
-                      "Perception" (Optimistic Layers).
+                      Use this to simulate network speed.
                     </p>
                   </div>
                 </div>
