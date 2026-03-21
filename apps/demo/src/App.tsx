@@ -276,7 +276,10 @@ export default function App() {
     rollbackUpdate: rollbackTaskListUpdate,
   } = useSnapbackLayer<ListPatch>();
 
-  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+  const [_pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+  const pendingRequests = useMemo(() => {
+    return _pendingRequests.toReversed();
+  }, [_pendingRequests]);
 
   const isPausedRef = useRef(isPaused);
 
