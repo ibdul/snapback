@@ -1,0 +1,13 @@
+{
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "bundler", // or "NodeNext"
+    "allowImportingTsExtensions": true,
+    "baseUrl": ".",
+    "paths": {
+      "@snapback/core": [
+        "../core/src/index.ts"
+      ]
+    }
+  }
+}
