@@ -1,12 +1,119 @@
 import "./App.css";
 import useSnapbackLayer from "@snapback/react";
 
-import { Bolt, History, Layers, Plus } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+
+import {
+  Bolt,
+  BookOpen,
+  CheckCircle2,
+  Copy,
+  Edit3,
+  History,
+  Info,
+  Layers,
+  Plus,
+  RotateCcw,
+  Terminal,
+  Trash2,
+} from "lucide-react";
+import { useState } from "react";
+
+const snippets = {
+  init: `// 1. Initialize the hook
+const { 
+  getOptimisticState, 
+  applyUpdate, 
+  rollbackUpdate 
+} = useOptimisticUpdatesLayer();
+
+// 2. Wrap your data
+const optimisticTasks = getOptimisticState(baseTasks);`,
+  add: `const handleAddTask = async (title) => {
+  const id = generateId();
+  
+  // Apply layer immediately
+  const reqId = applyUpdate({ id, title, __type: 'create' });
+
+  try {
+    const serverTask = await api.create(title);
+    setBaseTasks(prev => [...prev, serverTask]);
+  } finally {
+    // Clear optimistic layer once server confirms
+    rollbackUpdate(id, reqId);
+  }
+};`,
+  edit: `const handleEditTask = async (id, newTitle) => {
+  const reqId = applyUpdate({ id, title: newTitle });
+
+  try {
+    await api.patch(id, { title: newTitle });
+    setBaseTasks(prev => prev.map(t => 
+       t.id === id ? { ...t, title: newTitle } : t
+    ));
+  } finally {
+    rollbackUpdate(id, reqId);
+  }
+};`,
+  delete: `const handleDeleteTask = async (id) => {
+  // Use __type: 'delete' to mark as deleted in layers
+  const reqId = applyUpdate({ id, __type: 'delete' });
+
+  try {
+    await api.destroy(id);
+    setBaseTasks(prev => prev.filter(t => t.id !== id));
+  } finally {
+    rollbackUpdate(id, reqId);
+  }
+};`,
+  rollback: `try {
+  await api.update(data);
+} catch (err) {
+  // Simple: Since we don't update baseTasks until success,
+  // we just clear the layer and the UI "snaps back" automatically.
+  rollbackUpdate(id, requestId);
+  notifyError("Failed to sync changes.");
+}`,
+};
+
+const CodeBlock = ({ code, label }: { code: string; label: string }) => {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(code);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="group relative bg-black/40 rounded-xl border border-white/5 overflow-hidden">
+      <div className="flex justify-between items-center px-4 py-2 border-b border-white/5 bg-white/5">
+        <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest flex items-center gap-2">
+          <Terminal size={12} /> {label}
+        </span>
+        <button
+          onClick={handleCopy}
+          className="text-slate-500 hover:text-primary transition-colors"
+        >
+          {copied
+            ? <CheckCircle2 size={14} className="text-emerald-500" />
+            : <Copy size={14} />}
+        </button>
+      </div>
+      <pre className="p-4 text-[11px] font-mono leading-relaxed text-primary/90 overflow-x-auto whitespace-pre">
+        {code}
+      </pre>
+    </div>
+  );
+};
 
 export default function App() {
   const { applyUpdate, getSnapbackState } = useSnapbackLayer<
     { count: number }
   >();
+
+  const [activeTab, setActiveTab] = useState<keyof typeof snippets>("init");
+
   const countEntity = getSnapbackState("counter");
   const count = countEntity.count ?? 0;
 
@@ -98,6 +205,164 @@ export default function App() {
               Count ({count})
             </span>
           </button>
+        </section>
+
+        {/* Documentation Section */}
+        <section id="docs" className="pt-12 space-y-8">
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/5 pb-8">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 text-primary font-bold uppercase tracking-widest text-xs">
+                <BookOpen size={14} /> Usage Guide
+              </div>
+              <h2 className="text-4xl font-black text-white tracking-tight">
+                Implementation Patterns
+              </h2>
+            </div>
+            <div className="flex gap-2 bg-[#0d1526] p-1.5 rounded-xl border border-white/5 overflow-x-auto no-scrollbar">
+              {[
+                { id: "init", label: "Setup", icon: <Layers size={14} /> },
+                { id: "add", label: "Add", icon: <Plus size={14} /> },
+                { id: "edit", label: "Edit", icon: <Edit3 size={14} /> },
+                { id: "delete", label: "Delete", icon: <Trash2 size={14} /> },
+                {
+                  id: "rollback",
+                  label: "Rollback",
+                  icon: <RotateCcw size={14} />,
+                },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => setActiveTab(tab.id as keyof typeof snippets)}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all whitespace-nowrap ${activeTab === tab.id
+                    ? "bg-primary text-[#060b18]"
+                    : "text-slate-500 hover:text-white"
+                    }`}
+                >
+                  {tab.icon} {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+            <div className="space-y-6">
+              <div className="bg-white/5 rounded-2xl p-6 border border-white/5 space-y-4">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  {activeTab === "init" && "Getting Started"}
+                  {activeTab === "add" && "Adding New Entities"}
+                  {activeTab === "edit" && "Updating Existing State"}
+                  {activeTab === "delete" && "Soft Deletions"}
+                  {activeTab === "rollback" && "Handling Failures"}
+                </h3>
+                <div className="text-sm text-slate-400 leading-relaxed space-y-4">
+                  {activeTab === "init" && (
+                    <>
+                      <p>
+                        The library provides a single hook that maintains an
+                        internal store of "patches". You feed your base state
+                        into{" "}
+                        <code className="text-primary">
+                          getSnapbackState
+                        </code>, and it returns the merged result.
+                      </p>
+                      <ul className="space-y-2 list-disc pl-4 text-xs">
+                        <li>
+                          Zero dependency on how you store your base state
+                          (Redux, Zustand, useState).
+                        </li>
+                        <li>
+                          Non-destructive: The base state is never touched by
+                          the hook.
+                        </li>
+                      </ul>
+                    </>
+                  )}
+                  {activeTab === "add" && (
+                    <>
+                      <p>
+                        When creating a new entity, include{" "}
+                        <code className="text-primary">__type: 'create'</code>
+                        {" "}
+                        in the patch. The hook will treat this as a virtual
+                        entry that doesn't yet exist in the base state.
+                      </p>
+                      <p>
+                        This ensures your UI reflects the new item immediately
+                        before the database ID is even generated.
+                      </p>
+                    </>
+                  )}
+                  {activeTab === "edit" && (
+                    <>
+                      <p>
+                        Standard updates simply require the{" "}
+                        <code className="text-primary">id</code>{" "}
+                        of the entity and the fields you wish to override.
+                      </p>
+                      <p>
+                        Multiple layers can exist for the same ID; the hook
+                        automatically resolves them using the latest layer as
+                        the source of truth.
+                      </p>
+                    </>
+                  )}
+                  {activeTab === "delete" && (
+                    <>
+                      <p>
+                        Use{" "}
+                        <code className="text-primary">__type: 'delete'</code>
+                        {" "}
+                        to immediately remove an item from the optimistic
+                        result. This is much smoother than waiting for a 204 No
+                        Content response from your API.
+                      </p>
+                    </>
+                  )}
+                  {activeTab === "rollback" && (
+                    <>
+                      <p>
+                        Rollbacks are built-in. If a request fails, you simply
+                        don't update your base state and just call{" "}
+                        <code className="text-primary">rollbackUpdate</code>.
+                      </p>
+                      <p>
+                        The UI will automatically snap back to the base state
+                        because the optimistic layer override has been removed.
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3 p-4 bg-primary/5 rounded-xl border border-primary/10">
+                <div className="mt-1">
+                  <Info size={16} className="text-primary" />
+                </div>
+                <p className="text-[11px] text-primary/80 leading-normal">
+                  Pro-tip: You can pass a specific{" "}
+                  <code className="font-bold">requestId</code>{" "}
+                  to rollback a specific operation, or just the{" "}
+                  <code className="font-bold">id</code>{" "}
+                  to clear all layers for that entity.
+                </p>
+              </div>
+            </div>
+
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.2 }}
+              >
+                <CodeBlock
+                  label={`${activeTab.toUpperCase()}`}
+                  code={snippets[activeTab]}
+                />
+              </motion.div>
+            </AnimatePresence>
+          </div>
         </section>
       </main>
 
