@@ -4,31 +4,40 @@ import useSnapbackLayer from "@snapback/react";
 import { AnimatePresence, motion } from "motion/react";
 
 import {
+  AlertCircle,
   Bolt,
   BookOpen,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
+  Clock,
   Copy,
   Edit3,
   History,
   Info,
   Layers,
+  Pause,
+  Play,
   Plus,
   RotateCcw,
   Terminal,
+  Trash,
   Trash2,
+  XCircle,
+  Zap,
 } from "lucide-react";
-import { useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 const snippets = {
   init: `// 1. Initialize the hook
 const { 
-  getOptimisticState, 
+  getSnapbackState, 
   applyUpdate, 
   rollbackUpdate 
 } = useOptimisticUpdatesLayer();
 
 // 2. Wrap your data
-const optimisticTasks = getOptimisticState(baseTasks);`,
+const optimisticTasks = getSnapbackState(baseTasks);`,
   add: `const handleAddTask = async (title) => {
   const id = generateId();
   
@@ -76,6 +85,113 @@ const optimisticTasks = getOptimisticState(baseTasks);`,
 }`,
 };
 
+type Patch = {
+  id: string;
+} & Record<string, string | number>;
+
+type PendingRequest = {
+  requestId: string;
+  id: string;
+  label: string;
+  patch: Patch;
+  type: string;
+  latency: number;
+  elapsed: number;
+  onComplete: () => void;
+};
+
+type RequestHandler = (req: PendingRequest) => void;
+const PatchItem = (
+  { req, onFail, onCancel, isPaused }: {
+    req: PendingRequest;
+    onFail: RequestHandler;
+    onCancel: RequestHandler;
+    isPaused: boolean;
+  },
+) => {
+  const [isOpen, setIsOpen] = useState(false);
+  const progress = Math.min(100, (req.elapsed / req.latency) * 100);
+
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, x: 20 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, scale: 0.95 }}
+      className="rounded-xl border border-white/10 bg-white/5 overflow-hidden transition-all"
+    >
+      <div className="p-3">
+        <div className="flex justify-between items-center mb-2">
+          <div className="flex items-center gap-2">
+            {!isPaused
+              ? (
+                <div className="w-2 h-2 rounded-full bg-cyan-500 animate-pulse" />
+              )
+              : <Pause size={10} className="text-amber-500" />}
+            <span
+              className={`text-[10px] font-mono font-bold uppercase tracking-tight ${req.type === "create"
+                ? "text-emerald-400"
+                : req.type === "delete"
+                  ? "text-rose-400"
+                  : "text-cyan-400"
+                }`}
+            >
+              {req.type} • {req.id}
+            </span>
+          </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onFail(req)}
+              className="p-1 hover:bg-rose-500/20 text-rose-500 rounded transition-colors"
+            >
+              <AlertCircle size={14} />
+            </button>
+            <button
+              onClick={() => onCancel(req)}
+              className="p-1 hover:bg-slate-500/20 text-slate-400 rounded transition-colors"
+            >
+              <XCircle size={14} />
+            </button>
+          </div>
+        </div>
+
+        <div className="text-xs font-bold text-white truncate">
+          {req.label}
+        </div>
+
+        <button
+          onClick={() => setIsOpen(!isOpen)}
+          className="mt-2 flex items-center gap-1 text-[9px] font-bold uppercase text-slate-500 hover:text-cyan-400"
+        >
+          {isOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+          Data
+        </button>
+
+        <AnimatePresence>
+          {isOpen && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: "auto", opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="mt-2 p-2 bg-black/40 rounded border border-white/5 font-mono text-[10px] text-cyan-400/80">
+                <pre className="whitespace-pre-wrap break-all">{JSON.stringify(req.patch, null, 2)}</pre>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
+      <div className="h-1 w-full bg-white/5 relative">
+        <div
+          className="absolute top-0 left-0 h-full bg-cyan-500 transition-[width] duration-100 ease-linear"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+    </motion.div>
+  );
+};
+
 const CodeBlock = ({ code, label }: { code: string; label: string }) => {
   const [copied, setCopied] = useState(false);
 
@@ -108,14 +224,150 @@ const CodeBlock = ({ code, label }: { code: string; label: string }) => {
 };
 
 export default function App() {
-  const { applyUpdate, getSnapbackState } = useSnapbackLayer<
-    { count: number }
-  >();
+  const [latency, setLatency] = useState(3000);
+  const [isPaused, setIsPaused] = useState(false);
+  const [activeTab, setActiveTab] = useState("init");
+  const now = useMemo(() => {
+    const out = new Date();
+    return out.valueOf();
+  }, []);
+  const [tasks, setTasks] = useState([
+    {
+      id: "1",
+      title: "Refactor state logic",
+      status: "todo",
+      createdAt: now - 10000,
+    },
+    {
+      id: "2",
+      title: "Write documentation",
+      status: "todo",
+      createdAt: now - 5000,
+    },
+  ]);
 
-  const [activeTab, setActiveTab] = useState<keyof typeof snippets>("init");
+  const {
+    applyUpdate,
+    snapback_state,
+    rollbackUpdate,
+    getSnapbackState,
+    // rawUpdates,
+  } = useSnapbackLayer();
 
-  const countEntity = getSnapbackState("counter");
-  const count = countEntity.count ?? 0;
+  const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+
+  const isPausedRef = useRef(isPaused);
+
+  useEffect(() => {
+    isPausedRef.current = isPaused;
+  }, [isPaused]);
+
+  useEffect(() => {
+    const tickRate = 100;
+    const interval = setInterval(() => {
+      if (isPausedRef.current) return;
+
+      setPendingRequests((prev) => {
+        if (prev.length === 0) return prev;
+        const next = [];
+        let hasChanges = false;
+
+        for (const req of prev) {
+          const newElapsed = req.elapsed + tickRate;
+          if (newElapsed >= req.latency) {
+            req.onComplete();
+            rollbackUpdate(req.id, req.requestId);
+            hasChanges = true;
+          } else {
+            next.push({ ...req, elapsed: newElapsed });
+            hasChanges = true;
+          }
+        }
+        return hasChanges ? next : prev;
+      });
+    }, tickRate);
+    return () => clearInterval(interval);
+  }, []);
+
+  const optimisticTasks = tasks.sort((a, b) => b.createdAt - a.createdAt);
+
+  const createRequest = (
+    label: string,
+    patch: Patch,
+    type = "update",
+    onComplete: () => void,
+  ) => {
+    const reqId = applyUpdate({ ...patch, __type: type });
+    const newReq = {
+      requestId: reqId,
+      id: patch.id,
+      label,
+      patch,
+      type,
+      latency: latency,
+      elapsed: 0,
+      onComplete: onComplete,
+    };
+
+    setPendingRequests((prev) => [...prev, newReq]);
+  };
+
+  const addTask = () => {
+    const id = Math.random().toString(36).substr(2, 5);
+    const title = "New Task Layer";
+    const createdAt = Date.now();
+
+    createRequest(`Create Task`, { id, title, createdAt }, "create", () => {
+      setTasks((prev) => [...prev, { id, title, status: "todo", createdAt }]);
+    });
+  };
+
+  const editTask = (id: string, title: string) => {
+    const [main_title, revision] = title.split("_v");
+    const current_revision = revision?.trim() ?? "1";
+    const newTitle = `${main_title} _v ${Number(current_revision) + 1}`;
+    createRequest(`Edit Task ${id}`, { id, title: newTitle }, "update", () => {
+      setTasks((prev) =>
+        prev.map((t) => t.id === id ? { ...t, title: newTitle } : t)
+      );
+    });
+  };
+
+  const deleteTask = (id: string) => {
+    createRequest(`Delete Task ${id}`, { id }, "delete", () => {
+      setTasks((prev) => prev.filter((t) => t.id !== id));
+    });
+  };
+
+  const clearList = () => {
+    optimisticTasks.forEach((task) => {
+      if (!task) {
+        return;
+      }
+      createRequest(
+        `Batch Delete: ${task.id}`,
+        { id: task.id },
+        "delete",
+        () => {
+          setTasks((prev) => prev.filter((t) => t.id !== task.id));
+        },
+      );
+    });
+  };
+
+  const handleManualFail = (req: PendingRequest) => {
+    setPendingRequests((prev) =>
+      prev.filter((r) => r.requestId !== req.requestId)
+    );
+    rollbackUpdate(req.id, req.requestId);
+  };
+
+  const handleManualCancel = (req: PendingRequest) => {
+    setPendingRequests((prev) =>
+      prev.filter((r) => r.requestId !== req.requestId)
+    );
+    rollbackUpdate(req.id, req.requestId);
+  };
 
   return (
     <div className="min-h-screen bg-[#0b1326] text-[#dae2fd] font-sans selection:bg-primary/30 selection:text-white flex flex-col justify-between">
@@ -194,17 +446,232 @@ export default function App() {
               </span>
             </div>
           </div>
-          <button
-            className="inline-flex items-center gap-3 px-6 py-4 rounded-xl bg-[#171f33]/60 backdrop-blur-md border border-white/5 cursor-pointer"
-            onClick={() => {
-              applyUpdate({ id: "counter", count: count + 1 });
-            }}
-          >
-            <Plus size={20} className="text-primary" />
-            <span className="font-label text-xs uppercase tracking-widest font-bold">
-              Count ({count})
-            </span>
-          </button>
+        </section>
+
+        {/* Sandbox Section */}
+        <section className="space-y-12">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <div className="lg:col-span-8 space-y-6">
+              <div className="bg-[#0d1526] rounded-3xl border border-white/5 p-8 relative overflow-hidden flex flex-col h-[640px]">
+                <div className="flex justify-between items-center mb-8 relative z-10 shrink-0">
+                  <div>
+                    <h2 className="text-2xl font-bold text-white">
+                      Live Sandbox
+                    </h2>
+                    <p className="text-xs text-slate-500 uppercase tracking-widest font-bold mt-1">
+                      Interactive state visualization
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button
+                      onClick={() => setIsPaused(!isPaused)}
+                      className={`p-3 rounded-xl border transition-all ${isPaused
+                        ? "bg-amber-500/20 border-amber-500/50 text-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.2)]"
+                        : "bg-white/5 border-white/10 text-slate-400 hover:bg-white/10"
+                        }`}
+                    >
+                      {isPaused
+                        ? <Play size={18} fill="currentColor" />
+                        : <Pause size={18} fill="currentColor" />}
+                    </button>
+                    <button
+                      onClick={clearList}
+                      disabled={optimisticTasks.length === 0}
+                      className="flex items-center gap-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 border border-rose-500/20 px-4 py-2.5 rounded-xl text-sm font-bold transition-all disabled:opacity-30 disabled:cursor-not-allowed"
+                    >
+                      <Trash size={16} /> Clear
+                    </button>
+                    <button
+                      onClick={addTask}
+                      className="flex items-center gap-2 bg-cyan-600 hover:bg-cyan-500 text-white px-4 py-2.5 rounded-xl text-sm font-bold transition-all shadow-lg shadow-cyan-500/20"
+                    >
+                      <Plus size={18} /> New Task
+                    </button>
+                  </div>
+                </div>
+
+                <div className="space-y-3 relative z-10 overflow-y-auto flex-grow pr-2 custom-scrollbar">
+                  <AnimatePresence mode="popLayout">
+                    {optimisticTasks.length === 0
+                      ? (
+                        <motion.div
+                          key="empty"
+                          initial={{ opacity: 0, scale: 0.9 }}
+                          animate={{ opacity: 1, scale: 1 }}
+                          exit={{ opacity: 0, scale: 0.9 }}
+                          className="py-20 flex flex-col items-center justify-center border-2 border-dashed border-white/5 rounded-2xl text-slate-600 space-y-4"
+                        >
+                          <div className="p-4 bg-white/5 rounded-full">
+                            <CheckCircle2 size={32} className="opacity-20" />
+                          </div>
+                          <p className="text-sm italic">
+                            Queue cleared. Trigger an update to see layers.
+                          </p>
+                        </motion.div>
+                      )
+                      : (
+                        optimisticTasks.map((_task) => {
+                          if (!_task) {
+                            return (
+                              <Fragment key={crypto.randomUUID()}></Fragment>
+                            );
+                          }
+                          const task_snap = getSnapbackState(_task.id);
+                          const task = { ..._task, ...task_snap };
+                          const hasPending = !!snapback_state[_task.id]?.length;
+                          return (
+                            <motion.div
+                              key={task.id}
+                              layout
+                              initial={{ opacity: 0, x: -20 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, scale: 0.95 }}
+                              transition={{ duration: 0.2 }}
+                              className={`group flex justify-between items-center p-5 bg-white/5 rounded-2xl border transition-all ${hasPending
+                                ? "border-cyan-500/30 bg-cyan-500/5 shadow-[0_0_20px_rgba(6,182,212,0.05)]"
+                                : "border-white/5 hover:border-white/10"
+                                }`}
+                            >
+                              <div className="flex items-center gap-4">
+                                <div
+                                  className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-colors ${hasPending
+                                    ? "border-cyan-500/50 text-cyan-400 bg-cyan-500/10 animate-pulse"
+                                    : "border-white/10 text-slate-600"
+                                    }`}
+                                >
+                                  {hasPending
+                                    ? <Zap size={18} fill="currentColor" />
+                                    : <CheckCircle2 size={18} />}
+                                </div>
+                                <div>
+                                  <div className="text-white font-medium">
+                                    {task.title}
+                                  </div>
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <span className="text-[9px] text-slate-600 font-mono px-1.5 py-0.5 rounded bg-black/40 border border-white/5">
+                                      ID: {task.id}
+                                    </span>
+                                    {hasPending && (
+                                      <span className="text-[9px] text-cyan-400 font-bold uppercase tracking-wider animate-pulse">
+                                        Syncing...
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                                <button
+                                  onClick={() => editTask(task.id, task.title)}
+                                  className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 rounded-lg transition-colors"
+                                >
+                                  <Edit3 size={16} />
+                                </button>
+                                <button
+                                  onClick={() => deleteTask(task.id)}
+                                  className="p-2 bg-rose-500/10 hover:bg-rose-500/20 text-rose-400 rounded-lg transition-colors"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </div>
+                            </motion.div>
+                          );
+                        })
+                      )}
+                  </AnimatePresence>
+                </div>
+              </div>
+
+              <div className="bg-[#0d1526] rounded-2xl border border-white/5 p-6 flex items-center justify-between">
+                <div className="flex items-center gap-6">
+                  <div className="space-y-1">
+                    <div className="text-[10px] uppercase font-bold text-slate-500">
+                      Global Latency
+                    </div>
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="range"
+                        min="500"
+                        max="10000"
+                        step="500"
+                        value={latency}
+                        onChange={(e) => setLatency(Number(e.target.value))}
+                        className="w-32 h-1 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                      />
+                      <span className="text-xs font-mono text-cyan-400">
+                        {latency}ms
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="hidden md:flex items-center gap-2 text-slate-500 text-xs italic">
+                  <Info size={14} />{" "}
+                  Layers are applied in order of request timestamp.
+                </div>
+              </div>
+            </div>
+
+            <div className="lg:col-span-4 space-y-6">
+              <div className="bg-[#0d1526] rounded-3xl border border-white/5 p-6 h-[640px] flex flex-col">
+                <div className="flex justify-between items-center mb-6 shrink-0">
+                  <h3 className="text-sm font-black uppercase tracking-widest text-slate-500 flex items-center gap-2">
+                    <Clock size={14} /> Request Queue
+                  </h3>
+                  {isPaused && (
+                    <motion.span
+                      initial={{ opacity: 0, scale: 0.8 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      className="text-[10px] bg-amber-500/10 text-amber-500 px-2 py-0.5 rounded-full font-bold border border-amber-500/20 animate-pulse"
+                    >
+                      PAUSED
+                    </motion.span>
+                  )}
+                </div>
+
+                <div className="space-y-3 overflow-y-auto pr-2 custom-scrollbar flex-grow">
+                  <AnimatePresence initial={false}>
+                    {pendingRequests.length === 0
+                      ? (
+                        <motion.div
+                          key="empty-layers"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="py-20 flex flex-col items-center justify-center text-slate-600 space-y-3 opacity-50"
+                        >
+                          <Layers size={32} />
+                          <p className="text-xs uppercase tracking-tighter text-center px-4">
+                            No active network requests
+                          </p>
+                        </motion.div>
+                      )
+                      : (
+                        pendingRequests.map((req) => (
+                          <PatchItem
+                            key={req.requestId}
+                            req={req}
+                            onFail={handleManualFail}
+                            onCancel={handleManualCancel}
+                            isPaused={isPaused}
+                          />
+                        ))
+                      )}
+                  </AnimatePresence>
+                </div>
+
+                <div className="mt-6 pt-6 border-t border-white/5 shrink-0">
+                  <div className="bg-black/40 p-4 rounded-2xl border border-white/5 space-y-2">
+                    <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                      <Terminal size={12} /> Optimization
+                    </h4>
+                    <p className="text-[11px] text-slate-500 leading-relaxed">
+                      This UI logic separates the "Truth" (Base Data) from the
+                      "Perception" (Optimistic Layers).
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </section>
 
         {/* Documentation Section */}
@@ -358,7 +825,7 @@ export default function App() {
               >
                 <CodeBlock
                   label={`${activeTab.toUpperCase()}`}
-                  code={snippets[activeTab]}
+                  code={snippets[activeTab as keyof typeof snippets]}
                 />
               </motion.div>
             </AnimatePresence>
