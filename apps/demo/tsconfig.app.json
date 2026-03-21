@@ -5,6 +5,11 @@
     "useDefineForClassFields": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "module": "ESNext",
+    "baseUrl": ".",
+    "paths": {
+      "@snapback/react": ["../../packages/react/src/index.ts"],
+      "@snapback/core": ["../../packages/core/src/index.ts"]
+    },
     "types": ["vite/client"],
     "skipLibCheck": true,
 
