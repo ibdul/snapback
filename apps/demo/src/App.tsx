@@ -804,7 +804,11 @@ export default function App() {
                     <>
                       <p>
                         Install the Snapback React package with your favorite
-                        package manager:
+                        package manager.
+                        <span className="opacity-0">
+                          Install the Snapback React package with your favorite
+                          package manager.
+                        </span>
                       </p>
                     </>
                   )}
