@@ -1,73 +1,81 @@
-# React + TypeScript + Vite
+# Snapback Demo
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This app is the interactive playground for Snapback. It visualizes how optimistic patches are queued, projected into UI state, and rolled back when a request fails or is cancelled.
 
-Currently, two official plugins are available:
+The demo is built with Vite, React, Tailwind CSS, Motion, and `@snapback/react`.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+## What It Demonstrates
 
-## React Compiler
+The playground focuses on a small task list and shows how Snapback behaves under simulated network latency.
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+It currently demonstrates:
 
-## Expanding the ESLint configuration
+- optimistic task creation
+- optimistic task edits
+- optimistic task deletion
+- separate optimistic layers for task details and list membership
+- request progress over time
+- manual failure and cancellation
+- automatic snapback when a request settles and the optimistic patch is removed
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## How It Works
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+The app keeps confirmed task data in local React state and overlays optimistic changes from Snapback on top.
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+There are two `useSnapbackLayer()` stores in the demo:
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+- a detail layer for field updates like title changes
+- a list layer for create/delete operations and list membership changes
+
+Pending requests are simulated with a timer. Each request:
+
+1. applies an optimistic patch immediately
+2. appears in the request queue with a progress bar
+3. either completes after the configured latency or is manually failed/cancelled
+4. commits the confirmed change to base state on success
+5. removes the optimistic patch so the UI resolves cleanly
+
+## Run Locally
+
+From the repository root:
+
+```bash
+turbo run dev --filter=demo 
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+You can also run the workspace-wide dev pipeline from the root:
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
-
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+```bash
+turbo run dev
 ```
+
+## Available Scripts
+
+Inside `apps/demo`, the package exposes:
+
+```bash
+turbo run dev
+turbo run build
+turbo run lint
+turbo run preview
+```
+
+Or from the repo root:
+
+```bash
+turbo run build --filter=demo 
+turbo run lint --filter=demo 
+turbo run preview --filter=demo 
+```
+
+## Suggested Test Flow
+
+When validating the demo manually, try this sequence:
+
+1. Create a task and confirm it appears immediately before the simulated request finishes.
+2. Edit a task title and verify the updated title is visible optimistically.
+3. Delete a task and verify it disappears immediately from the projected list.
+4. Pause the queue and inspect the pending requests without progress advancing.
+5. Fail or cancel a request and verify the UI snaps back to confirmed state.
+6. Resume the queue and let requests complete normally.
+
