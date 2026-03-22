@@ -42,20 +42,6 @@ const {
 
 // 2. Wrap your data
 const optimisticTasks = getSnapbackState(baseTasks);`,
-  add: `const handleAddTask = async (title) => {
-  const id = generateId();
-  
-  // Apply layer immediately
-  const reqId = applyUpdate({ id, title, __type: 'create' });
-
-  try {
-    const serverTask = await api.create(title);
-    setBaseTasks(prev => [...prev, serverTask]);
-  } finally {
-    // Clear optimistic layer once server confirms
-    rollbackUpdate(id, reqId);
-  }
-};`,
   edit: `const handleEditTask = async (id, newTitle) => {
   const reqId = applyUpdate({ id, title: newTitle });
 
@@ -64,17 +50,6 @@ const optimisticTasks = getSnapbackState(baseTasks);`,
     setBaseTasks(prev => prev.map(t => 
        t.id === id ? { ...t, title: newTitle } : t
     ));
-  } finally {
-    rollbackUpdate(id, reqId);
-  }
-};`,
-  delete: `const handleDeleteTask = async (id) => {
-  // Use __type: 'delete' to mark as deleted in layers
-  const reqId = applyUpdate({ id, __type: 'delete' });
-
-  try {
-    await api.destroy(id);
-    setBaseTasks(prev => prev.filter(t => t.id !== id));
   } finally {
     rollbackUpdate(id, reqId);
   }
@@ -794,9 +769,7 @@ export default function App() {
                   icon: <Package size={14} />,
                 },
                 { id: "init", label: "Setup", icon: <Layers size={14} /> },
-                { id: "add", label: "Add", icon: <Plus size={14} /> },
                 { id: "edit", label: "Edit", icon: <Edit3 size={14} /> },
-                { id: "delete", label: "Delete", icon: <Trash2 size={14} /> },
                 {
                   id: "rollback",
                   label: "Rollback",
@@ -817,15 +790,13 @@ export default function App() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start w-full">
             <div className="space-y-6">
               <div className="bg-white/5 rounded-2xl p-6 border border-white/5 space-y-4">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
                   {activeTab === "installation" && "Install Snapback"}
                   {activeTab === "init" && "Getting Started"}
-                  {activeTab === "add" && "Adding New Entities"}
                   {activeTab === "edit" && "Updating Existing State"}
-                  {activeTab === "delete" && "Soft Deletions"}
                   {activeTab === "rollback" && "Handling Failures"}
                 </h3>
                 <div className="text-sm text-slate-400 leading-relaxed space-y-4">
@@ -860,21 +831,6 @@ export default function App() {
                       </ul>
                     </>
                   )}
-                  {activeTab === "add" && (
-                    <>
-                      <p>
-                        When creating a new entity, include{" "}
-                        <code className="text-primary">__type: 'create'</code>
-                        {" "}
-                        in the patch. The hook will treat this as a virtual
-                        entry that doesn't yet exist in the base state.
-                      </p>
-                      <p>
-                        This ensures your UI reflects the new item immediately
-                        before the database ID is even generated.
-                      </p>
-                    </>
-                  )}
                   {activeTab === "edit" && (
                     <>
                       <p>
@@ -886,18 +842,6 @@ export default function App() {
                         Multiple layers can exist for the same ID; the hook
                         automatically resolves them using the latest layer as
                         the source of truth.
-                      </p>
-                    </>
-                  )}
-                  {activeTab === "delete" && (
-                    <>
-                      <p>
-                        Use{" "}
-                        <code className="text-primary">__type: 'delete'</code>
-                        {" "}
-                        to immediately remove an item from the optimistic
-                        result. This is much smoother than waiting for a 204 No
-                        Content response from your API.
                       </p>
                     </>
                   )}
@@ -917,18 +861,20 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="flex items-start gap-3 p-4 bg-primary/5 rounded-xl border border-primary/10">
-                <div className="mt-1">
-                  <Info size={16} className="text-primary" />
+              {activeTab === "rollback" && (
+                <div className="flex items-start gap-3 p-4 bg-primary/5 rounded-xl border border-primary/10">
+                  <div className="mt-1">
+                    <Info size={16} className="text-primary" />
+                  </div>
+                  <p className="text-[11px] text-primary/80 leading-normal">
+                    Pro-tip: You can pass a specific{" "}
+                    <code className="font-bold">requestId</code>{" "}
+                    to rollback a specific operation, or just the{" "}
+                    <code className="font-bold">id</code>{" "}
+                    to clear all layers for that entity.
+                  </p>
                 </div>
-                <p className="text-[11px] text-primary/80 leading-normal">
-                  Pro-tip: You can pass a specific{" "}
-                  <code className="font-bold">requestId</code>{" "}
-                  to rollback a specific operation, or just the{" "}
-                  <code className="font-bold">id</code>{" "}
-                  to clear all layers for that entity.
-                </p>
-              </div>
+              )}
             </div>
 
             <AnimatePresence mode="wait">
