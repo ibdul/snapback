@@ -461,26 +461,18 @@ export default function App() {
           <div className="hidden md:flex items-center gap-8 font-label text-xs tracking-widest uppercase font-bold">
             <a
               className="text-primary border-b-2 border-primary pb-1"
-              href="#docs"
+              href="#"
             >
               Docs
             </a>
             <a
               className="text-slate-400 hover:text-white transition-colors"
-              href="#"
+              href="https://github.com/ibdul/snapback"
+              target="_blank"
             >
               GitHub
             </a>
-            <a
-              className="text-slate-400 hover:text-white transition-colors"
-              href="#sandbox"
-            >
-              Sandbox
-            </a>
           </div>
-          <button className="bg-[#06b6d4] text-[#003640] font-label px-6 py-2.5 rounded-full font-bold active:scale-95 transition-all hover:shadow-[0_0_20px_rgba(6,182,212,0.4)]">
-            Get Started
-          </button>
         </div>
       </nav>
 
@@ -916,7 +908,11 @@ export default function App() {
             <a className="hover:text-primary transition-colors" href="#">
               Documentation
             </a>
-            <a className="hover:text-primary transition-colors" href="#">
+            <a
+              className="hover:text-primary transition-colors"
+              href="https://github.com/ibdul/snapback"
+              target="_blank"
+            >
               GitHub
             </a>
             <a className="hover:text-primary transition-colors" href="#">
