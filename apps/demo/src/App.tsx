@@ -667,7 +667,9 @@ export default function App() {
                                 </div>
                               </div>
                             </div>
-                            <div className="flex gap-2 md:opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div
+                              className={`flex gap-2 group-hover:opacity-100 transition-opacity`}
+                            >
                               <button
                                 onClick={() => editTask(task.id, task.title)}
                                 className="p-2 bg-white/5 hover:bg-white/10 text-slate-400 rounded-lg transition-colors"
