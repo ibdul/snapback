@@ -1,160 +1,144 @@
-# Turborepo starter
+# Snapback
 
-This Turborepo starter is maintained by the Turborepo core team.
+Snapback is a small optimistic state layer for entity-based updates. It lets you queue local patches, derive the optimistic view for a specific entity, and roll back any request that fails so the UI snaps back to the last confirmed state.
 
-## Using this example
+This repository is a pnpm monorepo with:
 
-Run the following command:
+- `@snapback/core`: framework-agnostic queue/store primitives
+- `@snapback/react`: a React hook that wraps the core store
+- `apps/demo`: a Vite demo that visualizes optimistic updates, latency, and rollbacks
 
-```sh
-npx create-turbo@latest
+## Why It Exists
+
+Optimistic UI usually starts simple and gets messy once you need to:
+
+- stack multiple pending patches for the same record
+- keep request IDs around for targeted rollback
+- inspect pending optimistic state separately from server state
+- handle create, update, and delete flows without mutating confirmed data too early
+
+Snapback keeps that concern in a dedicated layer. Your confirmed server data stays separate, while optimistic patches are applied on top until the server responds.
+
+## Packages
+
+### `@snapback/core`
+
+The core package exports `createSnapbackLayer`, which returns a store with:
+
+- `applyUpdate(patch)` to enqueue an optimistic patch and get a `requestId`
+- `getSnapbackState(id)` to derive the merged optimistic state for one entity
+- `rollbackUpdate(entityId, requestId)` to remove one failed request
+- `clearUpdates(entityId?)` to clear one entity queue or the whole layer
+- `subscribe(listener)` to react to store changes
+- `snapback_state` and `snapback_state_dict` for direct inspection
+
+### `@snapback/react`
+
+The React package exports a default hook, `useSnapbackLayer<T>()`, which creates a core store and re-renders the component when the store changes.
+
+## Quick Example
+
+```tsx
+import useSnapbackLayer from "@snapback/react";
+
+type Task = {
+  id: string;
+  title: string;
+  done?: boolean;
+};
+
+function TaskEditor() {
+  const { applyUpdate, getSnapbackState, rollbackUpdate } =
+    useSnapbackLayer<Task>();
+
+  async function renameTask(id: string, title: string) {
+    const requestId = applyUpdate({ id, title });
+
+    try {
+      await api.tasks.update(id, { title });
+    } catch {
+      rollbackUpdate(id, requestId);
+    }
+  }
+
+  const optimisticTask = getSnapbackState("task-1");
+
+  return (
+    <button onClick={() => renameTask("task-1", "Write README")}>
+      {optimisticTask.title ?? "Untitled"}
+    </button>
+  );
+}
 ```
 
-## What's inside?
+In practice, you render confirmed server data and overlay the optimistic fields from Snapback until the request settles.
 
-This Turborepo includes the following packages/apps:
+## Project Structure
 
-### Apps and Packages
-
-- `docs`: a [Next.js](https://nextjs.org/) app
-- `web`: another [Next.js](https://nextjs.org/) app
-- `@repo/ui`: a stub React component library shared by both `web` and `docs` applications
-- `@repo/eslint-config`: `eslint` configurations (includes `eslint-config-next` and `eslint-config-prettier`)
-- `@repo/typescript-config`: `tsconfig.json`s used throughout the monorepo
-
-Each package/app is 100% [TypeScript](https://www.typescriptlang.org/).
-
-### Utilities
-
-This Turborepo has some additional tools already setup for you:
-
-- [TypeScript](https://www.typescriptlang.org/) for static type checking
-- [ESLint](https://eslint.org/) for code linting
-- [Prettier](https://prettier.io) for code formatting
-
-### Build
-
-To build all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo build
+```text
+.
+├── apps
+│   └── demo                # Vite playground for the Snapback UX
+├── packages
+│   ├── core                # Store and queue logic
+│   ├── react               # React hook wrapper
+│   ├── ui                  # Shared UI workspace for local components
+│   ├── eslint-config       # Shared lint config
+│   └── typescript-config   # Shared TS config
+├── package.json
+├── pnpm-workspace.yaml
+└── turbo.json
 ```
 
-Without global `turbo`, use your package manager:
+## Getting Started
 
-```sh
-cd my-turborepo
-npx turbo build
-yarn dlx turbo build
-pnpm exec turbo build
+### Prerequisites
+
+- Node.js `18+`
+- `pnpm` `10+`
+
+### Install
+
+```bash
+pnpm install
 ```
 
-You can build a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+### Run the Demo
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
+From the repo root:
 
-```sh
-turbo build --filter=docs
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo build --filter=docs
-yarn exec turbo build --filter=docs
-pnpm exec turbo build --filter=docs
-```
-
-### Develop
-
-To develop all apps and packages, run the following command:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
+```bash
 turbo dev
 ```
 
-Without global `turbo`, use your package manager:
+That starts the Turborepo dev pipeline. If you only want the demo app:
 
-```sh
-cd my-turborepo
-npx turbo dev
-yarn exec turbo dev
-pnpm exec turbo dev
+```bash
+turbo run dev --filter=demo
 ```
 
-You can develop a specific package by using a [filter](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters):
+### Build
 
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo dev --filter=web
+```bash
+turbo build
 ```
 
-Without global `turbo`:
+### Lint
 
-```sh
-npx turbo dev --filter=web
-yarn exec turbo dev --filter=web
-pnpm exec turbo dev --filter=web
+```bash
+turbo lint
 ```
 
-### Remote Caching
+### Format
 
-> [!TIP]
-> Vercel Remote Cache is free for all plans. Get started today at [vercel.com](https://vercel.com/signup?utm_source=remote-cache-sdk&utm_campaign=free_remote_cache).
-
-Turborepo can use a technique known as [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching) to share cache artifacts across machines, enabling you to share build caches with your team and CI/CD pipelines.
-
-By default, Turborepo will cache locally. To enable Remote Caching you will need an account with Vercel. If you don't have an account you can [create one](https://vercel.com/signup?utm_source=turborepo-examples), then enter the following commands:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed (recommended):
-
-```sh
-cd my-turborepo
-turbo login
+```bash
+turbo format
 ```
 
-Without global `turbo`, use your package manager:
+## Workspace Notes
 
-```sh
-cd my-turborepo
-npx turbo login
-yarn exec turbo login
-pnpm exec turbo login
-```
+- The root workspace uses `turbo` to coordinate app and package tasks.
+- The demo app is built with Vite, React 19, Tailwind CSS, Motion, and Lucide icons.
+- The core and React packages are bundled with `tsup`.
+- Unit tests currently live in `packages/core` and `packages/react` and run with `vitest`.
 
-This will authenticate the Turborepo CLI with your [Vercel account](https://vercel.com/docs/concepts/personal-accounts/overview).
-
-Next, you can link your Turborepo to your Remote Cache by running the following command from the root of your Turborepo:
-
-With [global `turbo`](https://turborepo.dev/docs/getting-started/installation#global-installation) installed:
-
-```sh
-turbo link
-```
-
-Without global `turbo`:
-
-```sh
-npx turbo link
-yarn exec turbo link
-pnpm exec turbo link
-```
-
-## Useful Links
-
-Learn more about the power of Turborepo:
-
-- [Tasks](https://turborepo.dev/docs/crafting-your-repository/running-tasks)
-- [Caching](https://turborepo.dev/docs/crafting-your-repository/caching)
-- [Remote Caching](https://turborepo.dev/docs/core-concepts/remote-caching)
-- [Filtering](https://turborepo.dev/docs/crafting-your-repository/running-tasks#using-filters)
-- [Configuration Options](https://turborepo.dev/docs/reference/configuration)
-- [CLI Usage](https://turborepo.dev/docs/reference/command-line-reference)
-# snapback
