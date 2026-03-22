@@ -17,6 +17,7 @@ import {
   History,
   Info,
   Layers,
+  Package,
   Pause,
   Play,
   Plus,
@@ -30,6 +31,8 @@ import {
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 
 const snippets = {
+  installation: `npm install @snapback/react`,
+
   init: `// 1. Initialize the hook
 const { 
   getSnapbackState, 
@@ -239,7 +242,7 @@ const CodeBlock = ({ code, label }: { code: string; label: string }) => {
 export default function App() {
   const [latency, setLatency] = useState(3000);
   const [isPaused, setIsPaused] = useState(false);
-  const [activeTab, setActiveTab] = useState("init");
+  const [activeTab, setActiveTab] = useState("installation");
 
   const now = useMemo(() => {
     const out = new Date();
@@ -785,6 +788,11 @@ export default function App() {
             </div>
             <div className="flex gap-2 bg-[#0d1526] p-1.5 rounded-xl border border-white/5 overflow-x-auto no-scrollbar">
               {[
+                {
+                  id: "installation",
+                  label: "Install",
+                  icon: <Package size={14} />,
+                },
                 { id: "init", label: "Setup", icon: <Layers size={14} /> },
                 { id: "add", label: "Add", icon: <Plus size={14} /> },
                 { id: "edit", label: "Edit", icon: <Edit3 size={14} /> },
@@ -813,6 +821,7 @@ export default function App() {
             <div className="space-y-6">
               <div className="bg-white/5 rounded-2xl p-6 border border-white/5 space-y-4">
                 <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  {activeTab === "installation" && "Install Snapback"}
                   {activeTab === "init" && "Getting Started"}
                   {activeTab === "add" && "Adding New Entities"}
                   {activeTab === "edit" && "Updating Existing State"}
@@ -820,6 +829,15 @@ export default function App() {
                   {activeTab === "rollback" && "Handling Failures"}
                 </h3>
                 <div className="text-sm text-slate-400 leading-relaxed space-y-4">
+                  {activeTab === "installation" && (
+                    <>
+                      <p>
+                        Install the Snapback React package with your favorite
+                        package manager:
+                      </p>
+                    </>
+                  )}
+
                   {activeTab === "init" && (
                     <>
                       <p>
